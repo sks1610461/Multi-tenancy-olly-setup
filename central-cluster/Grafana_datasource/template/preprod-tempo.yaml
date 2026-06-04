@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-tempo-preprod
+  namespace: monitoring-poc
+  labels:
+    grafana_datasource: "1"
+data:
+  tempo-preprod.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: tempo-preprod
+        type: tempo
+        uid: tempo-preprod-org2
+        orgId: 1
+        url: http://tempo-gateway.observability-poc.svc.cluster.local:80
+        access: proxy
+        basicAuth: false
+        jsonData:
+          httpHeaderName1: "X-Scope-OrgID"
+          httpHeaderName2: "Authorization"
+          grpcInsecure: true
+          streamingEnabled:
+            search: false
+            metrics: false
+        secureJsonData:
+          httpHeaderValue1: "pre-prod-tevico-cluster"
+          httpHeaderValue2: "Basic cHJlLXByb2QtdGV2aWNvLWNsdXN0ZXI6R0ZyUHkwU2U5ZWdQNUhaZ3VuKzFrdz09"
+        editable: true
