@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources-tenant99
+  namespace: monitoring-poc
+  labels:
+    grafana_datasource: "1" # Keeps the operator side-car hook active so Grafana reads this file
+data:
+  victoria-metrics-tenant99.yaml: |
+    apiVersion: 1
+
+    datasources:
+      - name: victoriametrics
+        type: prometheus
+        access: proxy
+        isDefault: true
+        
+        # 1. ASSIGNS THIS DATA SOURCE EXCLUSIVELY TO YOUR NEW ORG (Change to match your exact Org ID)
+        orgId: 2 
+
+        # 2. UPDATED ROUTING PATH TO TARGET TENANT 99
+        url: http://vmauth-vmauth.monitoring-poc.svc:8427/select/99/prometheus
+
+        basicAuth: true
+        
+        # 3. ALIGNED WITH YOUR SECURE "vmuser-central" IDENTITY
+        basicAuthUser: central-agent
+
+        secureJsonData:
+          # Crucial: Use the matching password from your central-password secret field
+          basicAuthPassword: CentralSecurePass2026! 
+
+        jsonData:
+          timeInterval: 30s
+          httpMethod: POST
