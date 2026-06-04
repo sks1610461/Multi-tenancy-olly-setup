@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: loki-ingress
+  namespace: logging-poc
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:886481146860:certificate/31c1667b-557b-40a0-a6e6-e51a580b27aa
+    alb.ingress.kubernetes.io/group.name: tevico
+    alb.ingress.kubernetes.io/group.order: "10"  
+    alb.ingress.kubernetes.io/healthcheck-path: /ready
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=false
+    alb.ingress.kubernetes.io/load-balancer-name: dev-tevico-kubernetes-alb-v2
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/target-type: instance
+
+spec:
+  ingressClassName: alb
+
+  rules:
+    - host: grafana-central.tevi.co
+      http:
+        paths:
+          - path: /o11y/loki
+            pathType: Prefix
+            backend:
+              service:
+                name: loki-gateway
+                port:
+                  number: 80                    
