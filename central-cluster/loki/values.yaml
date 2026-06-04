@@ -1,0 +1,375 @@
+logging:
+  global:
+    dnsService: "kube-dns"
+
+  loki:
+    auth_enabled: true    
+
+    schemaConfig:
+      configs:
+        - from: 2024-04-01
+          store: tsdb
+          object_store: s3
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+
+    commonConfig:
+      replication_factor: 1
+
+    compactor:
+      compaction_interval: 10m
+      delete_request_store: filesystem
+      retention_delete_delay: 2h
+      retention_enabled: true
+      working_directory: /var/loki/compactor
+
+    ingester:
+      chunk_encoding: snappy
+
+    limits_config:
+      retention_period: 7d
+
+    tracing:
+      enabled: true
+
+    querier:
+      max_concurrent: 1
+
+  deploymentMode: Distributed
+
+  gateway:
+    image:
+      registry: docker.io
+      repository: nginxinc/nginx-unprivileged
+      tag: 1.27.3-alpine
+
+    enabled: true
+
+    basicAuth:
+      enabled: true
+      existingSecret: logging-loki-gateway
+
+    nginxConfig:
+      serverSnippet: |
+
+        location = /o11y/loki/loki/api/v1/push {
+          rewrite ^/o11y/loki/(.*) /$1 break;
+          proxy_pass http://loki-distributor:3100;
+        }
+
+        location /o11y/loki/ {
+          rewrite ^/o11y/loki/(.*) /$1 break;
+          proxy_pass http://loki-query-frontend:3100;
+        }
+
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  chunksCache:
+    enabled: false
+    batchSize: 4
+    parallelism: 5
+    timeout: 5s
+    defaultValidity: 0s
+    replicas: 1
+    port: 11211
+    resources: {}
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  ingester:
+    replicas: 2
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    persistence:
+      enabled: true
+      claims:
+        - name: data
+          size: 2Gi
+          accessModes:
+            - ReadWriteOnce
+
+    zoneAwareReplication:
+      enabled: false
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  querier:
+    replicas: 1
+    maxUnavailable: 1
+    kind: Deployment
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 2
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  queryFrontend:
+    replicas: 1
+    maxUnavailable: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 10
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  queryScheduler:
+    replicas: 1
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  distributor:
+    replicas: 1
+    maxUnavailable: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 10
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  compactor:
+    replicas: 1
+    enabled: true
+    retention_enabled: true
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    persistence:
+      enabled: true
+      claims:
+        - name: data
+          size: 1Gi
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  indexGateway:
+    enabled: true
+    replicas: 1
+    maxUnavailable: 1  
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    persistence:
+      enabled: true
+      size: 1Gi
+
+    tolerations:
+      - key: "team"
+        operator: "Equal"
+        value: "o11y"
+        effect: "NoSchedule"
+
+  bloomPlanner:
+    replicas: 0
+
+  bloomBuilder:
+    replicas: 0
+
+  bloomGateway:
+    replicas: 0
+
+  minio:
+    enabled: true
+
+    persistence:
+      size: 15Gi
+
+    service:
+      type: ClusterIP
+      port: "9000"
+      nodePort: 32000
+
+  ruler:
+    enabled: false
+
+  backend:
+    replicas: 0
+
+  read:
+    replicas: 0
+
+  write:
+    replicas: 0
+
+  singleBinary:
+    replicas: 0
+
+  lokiCanary:
+    enabled: false
+
+  test:
+    enabled: false
+
+fluent-bit:
+  kind: DaemonSet
+  env:
+    - name: LOKI_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: fluent-bit-secret
+          key: username
+
+    - name: LOKI_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: fluent-bit-secret
+          key: password
+
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 25m
+      memory: 64Mi
+
+  config:
+    service: |
+      [SERVICE]
+          Flush        1
+          Daemon       Off
+          Log_Level    info
+          Parsers_File parsers.conf
+          HTTP_Server  On
+          HTTP_Listen  0.0.0.0
+          HTTP_Port    2020
+
+    inputs: |
+      [INPUT]
+          Name             tail
+          Path             /var/log/containers/*.log
+          Tag              kube.*
+          Refresh_Interval 5
+          Rotate_Wait      30
+          Mem_Buf_Limit    5MB
+          Skip_Long_Lines  On
+          DB               /var/log/flb_kube.db
+          Ignore_Older     4h
+          multiline.parser docker,cri
+
+    filters: |
+      [FILTER]
+          Name                kubernetes
+          Match               kube.*
+          K8S-Logging.Parser  On
+          K8S-Logging.Exclude Off
+          Keep_Log            On
+          Merge_Log           On
+
+    outputs: |
+      [OUTPUT]
+          Name                loki
+          Match               *
+          Host                loki-gateway.logging-poc.svc.cluster.local
+          Port                80
+          Tenant_ID           caprinno
+          HTTP_User           ${LOKI_USERNAME}
+          HTTP_Passwd         ${LOKI_PASSWORD}
+          Labels              namespace=$kubernetes['namespace_name'],container=$kubernetes['container_name'],comprinno_service=$kubernetes['labels']['comprinno_service'],comprinno_application_group=$kubernetes['labels']['comprinno_application_group'],environment=$kubernetes['labels']['comprinno_environment'],cluster=k8s-dev
+          Auto_Kubernetes_Labels on
+          Line_Format         json
+          Drop_Single_Key     on
+          Retry_Limit         False
