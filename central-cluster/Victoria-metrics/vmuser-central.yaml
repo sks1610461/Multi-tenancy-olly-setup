@@ -1,0 +1,27 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMUser
+metadata:
+  name: vmuser-central
+  namespace: monitoring-poc
+spec:
+  username: "central-agent"
+  passwordRef:
+    name: vm-auth-secret
+    key: central-password
+  targetRefs:
+    - crd:
+        kind: VMCluster/vminsert
+        name: vm
+        namespace: monitoring-poc
+      paths:
+        #- "/insert/100/prometheus/.*"
+        - "/insert/99/prometheus/.*"
+
+    #  ADD select paths for Grafana read
+    - crd:
+        kind: VMCluster/vmselect
+        name: vm
+        namespace: monitoring-poc
+      paths:
+        - "/select/99/prometheus/.*"
+        #- "/select/100/prometheus/.*"
