@@ -1,0 +1,23 @@
+# crashloop-test.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crashloop-test
+  namespace: monitoring-poc
+  labels:
+    app: crashloop-test
+    env: test
+    cluster: k8s-dev
+spec:
+  containers:
+  - name: crashloop
+    image: busybox
+    command: ["sh", "-c", "echo 'Starting...'; sleep 5; exit 1"]
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "16Mi"
+      limits:
+        cpu: "50m"
+        memory: "32Mi"
+  restartPolicy: Always
