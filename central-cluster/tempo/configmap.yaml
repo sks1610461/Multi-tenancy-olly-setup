@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-overrides
+  namespace: observability-poc
+data:
+  overrides.yaml: |
+    overrides:
+      # Tenant 1 — k8s-dev Cluster
+      caprinno:
+        ingestion:
+          rate_limit_bytes: 30000000
+          burst_size_bytes: 40000000
+        global:
+          max_bytes_per_trace: 10000000
+        read:
+          max_search_duration: 168h
+        metrics_generator:
+          processors:
+            - span-metrics
+            - service-graphs
+
+      # Tenant 2 — Preprod Cluster 
+      preprod:
+        ingestion:
+          rate_limit_bytes: 15000000
+          burst_size_bytes: 20000000
+        global:
+          max_bytes_per_trace: 5000000
+        read:
+          max_search_duration: 168h
+        metrics_generator:
+          processors:
+            - span-metrics
+            - service-graphs
