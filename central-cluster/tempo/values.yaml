@@ -1,0 +1,135 @@
+tempo:
+  multitenancyEnabled: true
+  global:
+    dnsService: kube-dns
+  tempo:
+    image:
+      registry: docker.io
+      repository: grafana/tempo
+      tag: null
+  traces:
+    otlp:
+      http:
+        enabled: true
+      grpc:
+        enabled: true
+
+  gateway:
+    enabled: true
+    replicas: 2
+    basicAuth:
+      enabled: true
+      existingSecret: tempo-gateway-secret
+    nginxConfig:
+      serverSnippet: |
+        location = /ready {
+          proxy_pass http://tempo-query-frontend.observability-poc.svc.cluster.local:3200/ready;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+          auth_basic off;
+        }
+        location = /metrics {
+          proxy_pass http://tempo-distributor.observability-poc.svc.cluster.local:3200/metrics;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+          auth_basic off;
+        }
+        location /v1/traces {
+          proxy_pass http://tempo-distributor.observability-poc.svc.cluster.local:4318;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+        }
+        location /otlp/v1/traces {
+          proxy_pass http://tempo-distributor.observability-poc.svc.cluster.local:4318;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+        }
+        location /o11y/tempo/v1/traces {
+          rewrite ^/o11y/tempo/(.*) /$1 break;
+          proxy_pass http://tempo-distributor.observability-poc.svc.cluster.local:4318;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+        }
+        location /o11y/tempo/otlp/v1/traces {
+          rewrite ^/o11y/tempo/(.*) /$1 break;
+          proxy_pass http://tempo-distributor.observability-poc.svc.cluster.local:4318;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+        }
+        location /o11y/tempo/ {
+          rewrite ^/o11y/tempo/(.*) /$1 break;
+          proxy_pass http://tempo-query-frontend.observability-poc.svc.cluster.local:3200;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+        }
+        location /o11y/tempo {
+          rewrite ^/o11y/tempo$ / break;
+          proxy_pass http://tempo-query-frontend.observability-poc.svc.cluster.local:3200;
+        }
+
+  global_overrides:
+    defaults:
+      ingestion:
+        rate_limit_bytes: 15000000
+        burst_size_bytes: 20000000
+      global:
+        max_bytes_per_trace: 5000000
+      read:
+        max_search_duration: 168h
+      metrics_generator:
+        processors:
+          - span-metrics
+          - service-graphs
+
+  memberlist:
+    cluster_label: "tempo.observability-poc"
+
+  ingester:
+    replicas: 2
+    persistence:
+      enabled: true
+      size: 10Gi
+    config:
+      replication_factor: 2
+      trace_idle_period: 60s
+      flush_check_period: 60s
+      lifecycler:
+        ring:
+          kvstore:
+            store: memberlist
+        heartbeat_period: 5s
+
+  distributor:
+    replicas: 2
+
+  compactor:
+    config:
+      compaction:
+        block_retention: 48h
+        compacted_block_retention: 1h
+        compaction_window: 1h
+        compaction_cycle: 30s
+
+  querier:
+    replicas: 2
+    config:
+      max_concurrent_queries: 20
+
+  queryFrontend:
+    replicas: 2
+
+  memcached:
+    enabled: false
+
+  metricsGenerator:
+    enabled: true
+    config:
+      storage:
+        path: /var/tempo/wal
+      processors:
+        - span-metrics
+        - service-graphs
+      remote_write:
+        - url: http://vmauth-vmauth.monitoring-poc.svc.cluster.local:8427/insert/100/prometheus/api/v1/write
+          headers:
+            Authorization: "Basic Y2VudHJhbC1hZ2VudDpDZW50cmFsU2VjdXJlUGFzczIwMjYh"
